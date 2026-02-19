@@ -42,7 +42,7 @@ class Router:
                 'cost': cost,
                 'next_hop': neighbor_addr
             }
-
+        
         print("Tabela de roteamento inicial:")
         print(json.dumps(self.routing_table, indent=4))
 
@@ -74,7 +74,6 @@ class Router:
     def summarize(self, table):
         """Agrega redes adjacentes com o mesmo next_hop."""
         if not table: return {}
-        
         by_nh = {}
         final_table = {}
 
@@ -93,7 +92,7 @@ class Router:
                 continue
             
             routes.sort(key=lambda x: self.ip_to_int(x['net']))
-            
+
             i = 0
             while i < len(routes):
                 r1 = routes[i]
@@ -109,7 +108,7 @@ class Router:
                         new_prefix = p1 - 1 
                         mascara = (0xFFFFFFFF << (32 - new_prefix)) & 0xFFFFFFFF
                         super_net_int = int1 & mascara
-                        
+
                         sn = [str((super_net_int >> i) & 0xFF) for i in (24, 16, 8, 0)]
                         summary_net = ".".join(sn) + f"/{new_prefix}"
                         
@@ -117,27 +116,17 @@ class Router:
                         final_table[summary_net] = {'cost': max_cost, 'next_hop': nh}
                         i += 2
                         continue
-                
+                    
                 final_table[r1['net']] = {'cost': r1['cost'], 'next_hop': nh}
                 i += 1
         return final_table
 
     def send_updates_to_neighbors(self):
-        """Envia a tabela sumarizada respeitando o Poison Reverse."""
+        """Envia a tabela SEM Poison Reverse e SEM Split Horizon (Causa o Loop)"""
         tabela_original = self.routing_table.copy()
 
         for neighbor_address in self.neighbors:
-            tabela_para_enviar = {}
-
-            for network, info in tabela_original.items():
-                if info['next_hop'] == neighbor_address:
-                    tabela_para_enviar[network] = {
-                        'cost': 16, 
-                        'next_hop': info['next_hop']
-                    }
-                else:
-                    tabela_para_enviar[network] = info
-
+            tabela_para_enviar = tabela_original.copy()
             tabela_sumarizada = self.summarize(tabela_para_enviar)
 
             payload = {
@@ -147,10 +136,9 @@ class Router:
 
             url = f'http://{neighbor_address}/receive_update'
             try:
-                print(f"Enviando tabela com Poison Reverse para {neighbor_address}")
                 requests.post(url, json=payload, timeout=5)
-            except requests.exceptions.RequestException as e:
-                print(f"Não foi possível conectar ao vizinho {neighbor_address}. Erro: {e}")
+            except requests.exceptions.RequestException:
+                pass
 
 # --- API Endpoints ---
 # Instância do Flask e do Roteador (serão inicializadas no main)
@@ -175,18 +163,18 @@ def receive_update():
     """Endpoint que recebe atualizações de roteamento de um vizinho."""
     if router_instance is None or not request.json:
         return jsonify({"error": "Invalid request"}), 400
-
+    
     update_data = request.json
     sender_address = update_data.get("sender_address")
     sender_table = update_data.get("routing_table")
 
     if not sender_address or not isinstance(sender_table, dict):
         return jsonify({"error": "Missing sender_address or routing_table"}), 400
-    
+        
     print(f"Recebida atualização de {sender_address}:")
     print(json.dumps(sender_table, indent=4))
 
-    
+
     link_cost = router_instance.neighbors.get(sender_address)
 
     if link_cost is None:
@@ -195,30 +183,15 @@ def receive_update():
     for network, info in sender_table.items():
         if network == router_instance.my_network or network == router_instance.my_address:
             continue
-        
-        if '/' in network:
-            ip_rec_int = router_instance.ip_to_int(network)
-            mask_rec = int(network.split('/')[1])
-            ip_my_int = router_instance.ip_to_int(router_instance.my_network)
-            mask_my = int(router_instance.my_network.split('/')[1])
-
-            if mask_rec <= mask_my:
-                bit_mask = (0xFFFFFFFF << (32 - mask_rec)) & 0xFFFFFFFF
-                if (ip_rec_int & bit_mask) == (ip_my_int & bit_mask):
-                    continue
 
         new_cost = link_cost + info['cost']
-        if new_cost > 16:
-            new_cost = 16
-       
+        
         if network not in router_instance.routing_table:
-            if new_cost < 16:
-                router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
+            router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
         else:
             current = router_instance.routing_table[network]
             if new_cost < current['cost'] or current['next_hop'] == sender_address:
-                if current['cost'] != new_cost or current['next_hop'] != sender_address:
-                    router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
+                router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
 
     return jsonify({"status": "success", "message": "Update received"}), 200
 
