@@ -123,14 +123,19 @@ class Router:
         return final_table
 
     def send_updates_to_neighbors(self):
-        """Envia a tabela sumarizada respeitando o Split Horizon."""
+        """Envia a tabela sumarizada respeitando o Poison Reverse."""
         tabela_original = self.routing_table.copy()
 
         for neighbor_address in self.neighbors:
             tabela_para_enviar = {}
 
             for network, info in tabela_original.items():
-                if info['next_hop'] != neighbor_address:
+                if info['next_hop'] == neighbor_address:
+                    tabela_para_enviar[network] = {
+                        'cost': 16, 
+                        'next_hop': info['next_hop']
+                    }
+                else:
                     tabela_para_enviar[network] = info
 
             tabela_sumarizada = self.summarize(tabela_para_enviar)
@@ -142,7 +147,7 @@ class Router:
 
             url = f'http://{neighbor_address}/receive_update'
             try:
-                print(f"Enviando tabela para {neighbor_address}")
+                print(f"Enviando tabela com Poison Reverse para {neighbor_address}")
                 requests.post(url, json=payload, timeout=5)
             except requests.exceptions.RequestException as e:
                 print(f"Não foi possível conectar ao vizinho {neighbor_address}. Erro: {e}")
@@ -203,10 +208,12 @@ def receive_update():
                     continue
 
         new_cost = link_cost + info['cost']
+        if new_cost > 16:
+            new_cost = 16
        
-        
         if network not in router_instance.routing_table:
-            router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
+            if new_cost < 16:
+                router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
         else:
             current = router_instance.routing_table[network]
             if new_cost < current['cost'] or current['next_hop'] == sender_address:
