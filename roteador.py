@@ -116,7 +116,7 @@ class Router:
                         final_table[summary_net] = {'cost': max_cost, 'next_hop': nh}
                         i += 2
                         continue
-                    
+
                 final_table[r1['net']] = {'cost': r1['cost'], 'next_hop': nh}
                 i += 1
         return final_table
@@ -138,7 +138,9 @@ class Router:
             try:
                 requests.post(url, json=payload, timeout=5)
             except requests.exceptions.RequestException:
-                pass
+                rotas_a_remover = [net for net, info in self.routing_table.items() if info['next_hop'] == neighbor_address]
+                for net in rotas_a_remover:
+                    del self.routing_table[net]
 
 # --- API Endpoints ---
 # Instância do Flask e do Roteador (serão inicializadas no main)
@@ -186,12 +188,17 @@ def receive_update():
 
         new_cost = link_cost + info['cost']
         
+        if new_cost > 50:
+            new_cost = 50
+        
         if network not in router_instance.routing_table:
-            router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
+            if new_cost < 50:
+                router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
         else:
             current = router_instance.routing_table[network]
             if new_cost < current['cost'] or current['next_hop'] == sender_address:
-                router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
+                if current['cost'] != new_cost or current['next_hop'] != sender_address:
+                    router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
 
     return jsonify({"status": "success", "message": "Update received"}), 200
 
