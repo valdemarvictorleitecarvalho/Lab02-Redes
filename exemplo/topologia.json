@@ -2,19 +2,19 @@
     {
         "name": "RouterA",
         "network": "10.0.0.0/24",
-        "address": "127.0.0.1:5000",
+        "address": "150.165.74.198:5000",
         "config_file": "exemplo/config_A.csv"
     },
     {
         "name": "RouterB",
         "network": "10.0.1.0/24",
-        "address": "127.0.0.1:5001",
+        "address": "192.168.51.100:5000",
         "config_file": "exemplo/config_B.csv"
     },
     {
         "name": "RouterC",
         "network": "10.0.2.0/23",
-        "address": "127.0.0.1:5002",
+        "address": "150.165.74.203:5000",
         "config_file": "exemplo/config_C.csv"
     }
 ]
