@@ -228,6 +228,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--file', type=str, required=True, help="Arquivo CSV de configuração de vizinhos.")
     parser.add_argument('--network', type=str, required=True, help="Rede administrada por este roteador (ex: 10.0.1.0/24).")
     parser.add_argument('--interval', type=int, default=10, help="Intervalo de atualização periódica em segundos.")
+    parser.add_argument('--ip', required=True)
     args = parser.parse_args()
 
     # Leitura do arquivo de configuração de vizinhos
@@ -244,7 +245,7 @@ if __name__ == '__main__':
         print(f"Erro no formato do arquivo CSV: {e}. Verifique as colunas 'vizinho' e 'custo'.")
         exit(1)
 
-    my_full_address = f"127.0.0.1:{args.port}"
+    my_full_address = f"{args.ip}:{args.port}"
     print("--- Iniciando Roteador ---")
     print(f"Endereço: {my_full_address}")
     print(f"Rede Local: {args.network}")
@@ -261,3 +262,5 @@ if __name__ == '__main__':
 
     # Inicia o servidor Flask
     app.run(host='0.0.0.0', port=args.port, debug=False)
+
+# Comando para inicialização da rede: python roteador.py --ip 150.165.42.<valor> -p 5000 -f scenario_Grupo2/R<valor>.csv --network 10.0.<valor>.0/24
