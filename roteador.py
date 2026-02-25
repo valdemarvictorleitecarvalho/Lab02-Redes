@@ -261,6 +261,6 @@ if __name__ == '__main__':
     )
 
     # Inicia o servidor Flask
-    app.run(host='0.0.0.0', port=args.port, debug=False)
+    app.run(host=args.ip, port=args.port, debug=False)
 
 # Comando para inicialização da rede: python roteador.py --ip 150.165.42.<valor> -p 5000 -f scenario_Grupo2/R<valor>.csv --network 10.0.<valor>.0/24
