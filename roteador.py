@@ -175,7 +175,7 @@ def get_routes():
             "my_network": router_instance.my_network,
             "my_address": router_instance.my_address,
             "update_interval": router_instance.update_interval,
-            "routing_table": router_instance.routing_table # Exibe a tabela de roteamento atual
+            "routing_table": router_instance.summarize(router_instance.routing_table) # Exibe a tabela de roteamento atual
         })
     return jsonify({"error": "Roteador não inicializado"}), 500
 
@@ -228,8 +228,6 @@ def receive_update():
             if new_cost < current['cost'] or current['next_hop'] == sender_address:
                 if current['cost'] != new_cost or current['next_hop'] != sender_address:
                     router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
-
-    router_instance.routing_table = router_instance.summarize(router_instance.routing_table)
 
     return jsonify({"status": "success", "message": "Update received"}), 200
 
