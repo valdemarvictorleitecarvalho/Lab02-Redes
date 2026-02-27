@@ -197,11 +197,11 @@ def receive_update():
 
         new_cost = link_cost + info['cost']
         
-        if new_cost > 50:
-            new_cost = 50
+        if new_cost > 16:
+            new_cost = 16
         
         if network not in router_instance.routing_table:
-            if new_cost < 50:
+            if new_cost < 16:
                 router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
         else:
             current = router_instance.routing_table[network]
