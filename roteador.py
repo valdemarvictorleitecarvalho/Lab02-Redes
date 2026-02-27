@@ -72,10 +72,12 @@ class Router:
         return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3]
     
     def summarize(self, table):
-        """Agrega redes adjacentes com o mesmo next_hop."""
+        """Agrega redes adjacentes com o mesmo next_hop de forma recursiva."""
         if not table: return {}
         by_nh = {}
         final_table = {}
+
+        had_aggregation = False 
 
         for net, info in table.items():
             if ':' in net or net == self.my_network:
@@ -108,17 +110,24 @@ class Router:
                         new_prefix = p1 - 1 
                         mascara = (0xFFFFFFFF << (32 - new_prefix)) & 0xFFFFFFFF
                         super_net_int = int1 & mascara
-
-                        sn = [str((super_net_int >> i) & 0xFF) for i in (24, 16, 8, 0)]
+                        
+                        sn = [str((super_net_int >> shift) & 0xFF) for shift in (24, 16, 8, 0)]
                         summary_net = ".".join(sn) + f"/{new_prefix}"
                         
                         max_cost = max(r1['cost'], r2['cost'])
                         final_table[summary_net] = {'cost': max_cost, 'next_hop': nh}
+                        
+                        had_aggregation = True 
+                        
                         i += 2
                         continue
 
                 final_table[r1['net']] = {'cost': r1['cost'], 'next_hop': nh}
                 i += 1
+                
+        if had_aggregation:
+            return self.summarize(final_table)
+            
         return final_table
 
     def send_updates_to_neighbors(self):
@@ -199,6 +208,8 @@ def receive_update():
             if new_cost < current['cost'] or current['next_hop'] == sender_address:
                 if current['cost'] != new_cost or current['next_hop'] != sender_address:
                     router_instance.routing_table[network] = {'cost': new_cost, 'next_hop': sender_address}
+
+    router_instance.routing_table = router_instance.summarize(router_instance.routing_table)
 
     return jsonify({"status": "success", "message": "Update received"}), 200
 
