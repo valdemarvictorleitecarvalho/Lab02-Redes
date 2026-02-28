@@ -145,7 +145,7 @@ class Router:
 
             url = f'http://{neighbor_address}/receive_update'
             try:
-                requests.post(url, json=payload, timeout=5)
+                requests.post(url, json=payload, timeout=15)
             except requests.exceptions.RequestException:
                 rotas_a_remover = [net for net, info in self.routing_table.items() if info['next_hop'] == neighbor_address]
                 for net in rotas_a_remover:
@@ -185,6 +185,8 @@ def receive_update():
     print(f"Recebida atualização de {sender_address}:")
     print(json.dumps(sender_table, indent=4))
 
+    if sender_address == router_instance.my_address:
+         return jsonify({"status": "ignored", "message": "Ignoring own package"}), 200
 
     link_cost = router_instance.neighbors.get(sender_address)
 
