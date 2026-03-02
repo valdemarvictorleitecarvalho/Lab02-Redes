@@ -133,7 +133,8 @@ class Router:
 
     def send_updates_to_neighbors(self):
         """Envia a tabela sumarizada respeitando o Poison Reverse."""
-        tabela_original = self.routing_table.copy()
+
+        tabela_original = self.summarize(self.routing_table)
 
         for neighbor_address in self.neighbors:
             tabela_para_enviar = {}
@@ -141,17 +142,15 @@ class Router:
             for network, info in tabela_original.items():
                 if info['next_hop'] == neighbor_address:
                     tabela_para_enviar[network] = {
-                        'cost': 16, 
+                        'cost': 16,
                         'next_hop': info['next_hop']
                     }
                 else:
                     tabela_para_enviar[network] = info
 
-            tabela_sumarizada = self.summarize(tabela_para_enviar)
-
             payload = {
                 "sender_address": self.my_address,
-                "routing_table": tabela_sumarizada
+                "routing_table": tabela_para_enviar
             }
 
             url = f'http://{neighbor_address}/receive_update'
