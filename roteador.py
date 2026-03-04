@@ -72,11 +72,13 @@ class Router:
         return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3]
     
     def summarize(self, table):
-        """Agrega redes adjacentes com o mesmo next_hop."""
+        """Agrega redes adjacentes com o mesmo next_hop de forma recursiva."""
         if not table: return {}
         
         by_nh = {}
         final_table = {}
+
+        had_aggregation = False 
 
         for net, info in table.items():
             if ':' in net or net == self.my_network:
@@ -110,21 +112,29 @@ class Router:
                         mascara = (0xFFFFFFFF << (32 - new_prefix)) & 0xFFFFFFFF
                         super_net_int = int1 & mascara
                         
-                        sn = [str((super_net_int >> i) & 0xFF) for i in (24, 16, 8, 0)]
+                        sn = [str((super_net_int >> shift) & 0xFF) for shift in (24, 16, 8, 0)]
                         summary_net = ".".join(sn) + f"/{new_prefix}"
                         
                         max_cost = max(r1['cost'], r2['cost'])
                         final_table[summary_net] = {'cost': max_cost, 'next_hop': nh}
+                        
+                        had_aggregation = True 
+                        
                         i += 2
                         continue
                 
                 final_table[r1['net']] = {'cost': r1['cost'], 'next_hop': nh}
                 i += 1
+                
+        if had_aggregation:
+            return self.summarize(final_table)
+            
         return final_table
 
     def send_updates_to_neighbors(self):
         """Envia a tabela sumarizada respeitando o Poison Reverse."""
-        tabela_original = self.routing_table.copy()
+
+        tabela_original = self.summarize(self.routing_table)
 
         for neighbor_address in self.neighbors:
             tabela_para_enviar = {}
@@ -132,17 +142,15 @@ class Router:
             for network, info in tabela_original.items():
                 if info['next_hop'] == neighbor_address:
                     tabela_para_enviar[network] = {
-                        'cost': 16, 
+                        'cost': 16,
                         'next_hop': info['next_hop']
                     }
                 else:
                     tabela_para_enviar[network] = info
 
-            tabela_sumarizada = self.summarize(tabela_para_enviar)
-
             payload = {
                 "sender_address": self.my_address,
-                "routing_table": tabela_sumarizada
+                "routing_table": tabela_para_enviar
             }
 
             url = f'http://{neighbor_address}/receive_update'
@@ -166,7 +174,7 @@ def get_routes():
             "my_network": router_instance.my_network,
             "my_address": router_instance.my_address,
             "update_interval": router_instance.update_interval,
-            "routing_table": router_instance.routing_table # Exibe a tabela de roteamento atual
+            "routing_table": router_instance.summarize(router_instance.routing_table) # Exibe a tabela de roteamento atual
         })
     return jsonify({"error": "Roteador não inicializado"}), 500
 
